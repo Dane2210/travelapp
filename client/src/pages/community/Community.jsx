@@ -1,11 +1,64 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { FaStar, FaRegStar } from 'react-icons/fa';
 
 export default function Community() {
   const [activeTab, setActiveTab] = useState('trending');
   
+  // Handle rating a post
+  const handleRatePost = (postId, newRating) => {
+    setPosts(posts.map(post => {
+      if (post.id === postId) {
+        // In a real app, you would make an API call here to update the rating
+        const newTotalRatings = post.userRating ? post.totalRatings : post.totalRatings + 1;
+        const newAvgRating = post.userRating 
+          ? (post.rating * post.totalRatings - post.userRating + newRating) / post.totalRatings
+          : (post.rating * post.totalRatings + newRating) / newTotalRatings;
+        
+        return {
+          ...post,
+          rating: newAvgRating,
+          userRating: newRating,
+          totalRatings: newTotalRatings
+        };
+      }
+      return post;
+    }));
+  };
+  
+  // Star rating component
+  const StarRating = ({ rating, onRate, interactive = false }) => {
+    const [hover, setHover] = useState(null);
+    
+    return (
+      <div className="star-rating">
+        {[...Array(10)].map((_, index) => {
+          const ratingValue = index + 1;
+          return (
+            <span
+              key={index}
+              className="star"
+              style={{
+                color: ratingValue <= (hover || rating) ? '#ffc107' : '#e4e5e9',
+                cursor: interactive ? 'pointer' : 'default',
+                fontSize: '1.2rem',
+                marginRight: '2px',
+              }}
+              onMouseEnter={() => interactive && setHover(ratingValue)}
+              onMouseLeave={() => interactive && setHover(null)}
+              onClick={() => interactive && onRate(ratingValue)}
+            >
+              {ratingValue <= (hover || rating) ? <FaStar /> : <FaRegStar />}
+            </span>
+          );
+        })}
+        <span className="rating-text">{rating.toFixed(1)}/10</span>
+      </div>
+    );
+  };
+
   // Sample posts data - replace with real data from your API
-  const posts = [
+  const [posts, setPosts] = useState([
     {
       id: 1,
       user: {
@@ -18,7 +71,10 @@ export default function Community() {
       likes: 42,
       comments: 8,
       timeAgo: '2h ago',
-      tags: ['japan', 'kyoto', 'traveltips']
+      tags: ['japan', 'kyoto', 'traveltips'],
+      rating: 8.5,
+      userRating: 0,
+      totalRatings: 24
     },
     {
       id: 2,
@@ -32,9 +88,12 @@ export default function Community() {
       likes: 128,
       comments: 24,
       timeAgo: '1d ago',
-      tags: ['paris', 'eiffeltower', 'europe']
+      tags: ['paris', 'eiffeltower', 'europe'],
+      rating: 9.2,
+      userRating: 0,
+      totalRatings: 42
     }
-  ];
+  ]);
 
   return (
     <div className="page">
@@ -108,6 +167,18 @@ export default function Community() {
                 <button className="action-btn">
                   ↪️ Share
                 </button>
+              </div>
+              
+              <div className="post-rating">
+                <div className="rating-header">
+                  <span className="rating-average">{post.rating.toFixed(1)}</span>
+                  <span className="rating-count">({post.totalRatings} ratings)</span>
+                </div>
+                <StarRating 
+                  rating={post.userRating || post.rating} 
+                  onRate={(rating) => handleRatePost(post.id, rating)}
+                  interactive={true}
+                />
               </div>
             </div>
           ))
