@@ -1,0 +1,60 @@
+service: travelapp-api
+frameworkVersion: '4'
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  region: us-west-1
+  memorySize: 512
+  timeout: 29  # Set to 29s to avoid API Gateway timeout conflicts
+  httpApi:
+    cors:
+      allowedOrigins:
+        - 'https://main.d1p8s18sb86ug.amplifyapp.com'
+        - 'http://localhost:5173'
+      allowedHeaders:
+        - Content-Type
+        - Authorization
+      allowedMethods:
+        - '*'
+  environment:
+    NODE_OPTIONS: '--require source-map-support/register'
+    NODE_ENV: production
+    Secrets_ID: ${param:secretsId, 'your-secret-id-here'}
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - secretsmanager:GetSecretValue
+          Resource: !Sub "arn:aws:secretsmanager:${aws:region}:${aws:accountId}:secret:${self:provider.environment.Secrets_ID}-*"
+
+functions:
+  api:
+    handler: src/lambda.handler
+    events:
+      - httpApi:
+          path: /{proxy+}
+          method: ANY
+
+plugins:
+  - serverless-offline
+
+package:
+  patterns:
+    - '!./**'  # Exclude everything by default
+    # Then include only what we need
+    - 'src/**'
+    - 'node_modules/**'
+    - 'package.json'
+    - 'package-lock.json'
+    # Only exclude development and test files
+    - '!node_modules/**/*.test.js'
+    - '!node_modules/**/test/**'
+    - '!node_modules/**/tests/**'
+    - '!node_modules/**/__tests__/**'
+    - '!node_modules/**/examples/**'
+    - '!node_modules/**/coverage/**'
+    - '!node_modules/**/*.md'
+    - '!node_modules/**/*.ts'
+    - '!node_modules/.bin/**'
