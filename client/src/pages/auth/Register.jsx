@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { supabase } from '../../lib/supabaseClient';
 
 export default function Register() {
   const [formData, setFormData] = useState({
@@ -49,20 +50,28 @@ export default function Register() {
     setLoading(true);
     
     try {
-      // TODO: Replace with actual registration logic
-      console.log('Registration attempt with:', {
-        name: formData.name,
+      setLoading(true);
+      const { data, error } = await supabase.auth.signUp({
         email: formData.email,
-        password: formData.password
+        password: formData.password,
+        options: {
+          data: { name: formData.name, role: 'traveler' },
+          emailRedirectTo: window.location.origin + '/login'
+        }
       });
-      
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // On successful registration, redirect to verification or home
-      navigate('/verify-email');
+      if (error) throw error;
+
+      // If email confirmation is enabled, no session yet
+      if (!data.session) {
+        navigate('/login', { replace: true });
+        return;
+      }
+
+      // If auto-confirmed, take the user to onboarding
+      localStorage.setItem('userRole', data.session.user.user_metadata?.role || 'traveler');
+      navigate('/onboarding', { replace: true });
     } catch (err) {
-      setError('Failed to create an account. Please try again.');
+      setError(err.message || 'Failed to create an account. Please try again.');
       console.error('Registration error:', err);
     } finally {
       setLoading(false);

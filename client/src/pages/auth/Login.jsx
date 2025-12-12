@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { supabase, supabaseReady } from '../../lib/supabaseClient';
 
 export default function Login() {
   const [formData, setFormData] = useState({
@@ -24,16 +25,22 @@ export default function Login() {
     setLoading(true);
     
     try {
-      // TODO: Replace with actual authentication logic
-      console.log('Login attempt with:', formData);
-      
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // On successful login, redirect to home or previous page
-      navigate('/');
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: formData.email,
+        password: formData.password,
+      });
+      if (error) throw error;
+
+      const role = data.session?.user?.user_metadata?.role || 'traveler';
+      localStorage.setItem('userRole', role);
+
+      if (role === 'moderator' || role === 'admin') {
+        navigate('/moderator', { replace: true });
+      } else {
+        navigate('/', { replace: true });
+      }
     } catch (err) {
-      setError('Failed to log in. Please check your credentials and try again.');
+      setError(err.message || 'Failed to log in. Please check your credentials and try again.');
       console.error('Login error:', err);
     } finally {
       setLoading(false);
@@ -45,6 +52,12 @@ export default function Login() {
       <div className="auth-container">
         <h1>Welcome Back</h1>
         <p className="subtitle">Log in to continue your travel journey</p>
+
+        {!supabaseReady && (
+          <div className="alert error" style={{ marginTop: '8px' }}>
+            Authentication backend is not configured. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY, then restart the dev server.
+          </div>
+        )}
         
         {error && <div className="alert error">{error}</div>}
         
@@ -84,7 +97,7 @@ export default function Login() {
           <button 
             type="submit" 
             className="btn primary full-width"
-            disabled={loading}
+            disabled={loading || !supabaseReady}
           >
             {loading ? 'Logging in...' : 'Log In'}
           </button>
