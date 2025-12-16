@@ -11,6 +11,7 @@ import Home from './pages/Home';
 import Trips from './pages/trips/Trips';
 import Community from './pages/community/Community';
 import Profile from './pages/profile/Profile';
+import EditProfile from './pages/profile/EditProfile';
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
 import ForgotPassword from './pages/auth/ForgotPassword';
@@ -213,6 +214,11 @@ export default function App() {
               <Route path="/profile" element={
                 <ProtectedRoute isAuthenticated={isAuthenticated}>
                   <Profile />
+                </ProtectedRoute>
+              } />
+              <Route path="/profile/edit" element={
+                <ProtectedRoute isAuthenticated={isAuthenticated}>
+                  <EditProfile />
                 </ProtectedRoute>
               } />
               <Route path="/login" element={<Login />} />

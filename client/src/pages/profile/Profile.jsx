@@ -1,34 +1,71 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
+import { supabase } from '../../lib/supabaseClient';
 
 export default function Profile() {
   const [activeTab, setActiveTab] = useState('trips');
-  
-  // Sample user data - replace with real data from your API
-  const user = {
-    name: 'Alex Johnson',
-    username: 'alexj',
-    email: 'alex@example.com',
-    bio: 'Travel enthusiast | Photographer | Foodie',
-    location: 'San Francisco, CA',
-    joinDate: 'January 2023',
-    avatar: 'profile-avatar.jpg',
-    coverPhoto: 'profile-cover.jpg',
-    stats: {
-      trips: 12,
-      followers: 245,
-      following: 189,
-      posts: 56
-    },
-    upcomingTrips: [
-      { id: 1, destination: 'Paris, France', dates: 'Jun 15 - Jun 30, 2024' },
-      { id: 2, destination: 'Tokyo, Japan', dates: 'Dec 1 - Dec 15, 2024' },
-    ],
-    pastTrips: [
-      { id: 3, destination: 'New York, USA', dates: 'Mar 10 - Mar 17, 2023', rating: 5 },
-      { id: 4, destination: 'Barcelona, Spain', dates: 'Sep 5 - Sep 12, 2023', rating: 4 },
-    ]
-  };
+  const [loading, setLoading] = useState(true);
+  const [session, setSession] = useState(null);
+  const [profile, setProfile] = useState(null);
+  const [error, setError] = useState('');
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      const { data } = await supabase.auth.getSession();
+      if (!mounted) return;
+      setSession(data.session);
+      if (!data.session) {
+        setLoading(false);
+        return;
+      }
+      const uid = data.session.user.id;
+      const { data: rows, error: err } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', uid)
+        .maybeSingle();
+      if (err) {
+        setError(err.message);
+      } else {
+        setProfile(rows || null);
+      }
+      setLoading(false);
+    })();
+    return () => { mounted = false; };
+  }, []);
+
+  // Compute a user view model every render to avoid conditional hooks
+  const user = (() => {
+    const u = session?.user;
+    if (!u) return null;
+    return {
+      name: profile?.name || u.user_metadata?.name || u.user_metadata?.full_name || (u.email?.split('@')[0] || ''),
+      username: profile?.username || u.user_metadata?.username || (u.user_metadata?.name ? u.user_metadata.name.replace(/\s+/g, '').toLowerCase() : (u.email?.split('@')[0] || '')),
+      email: u.email,
+      bio: profile?.bio || '',
+      location: profile?.location || '',
+      joinDate: new Date(u.created_at).toLocaleDateString(undefined, { month: 'long', year: 'numeric' }),
+      avatar: profile?.avatar_url || 'profile-avatar.jpg',
+      coverPhoto: profile?.cover_url || 'profile-cover.jpg',
+      stats: { trips: 0, followers: 0, following: 0, posts: 0 },
+      upcomingTrips: [],
+      pastTrips: [],
+    };
+  })();
+
+  if (loading) {
+    return (
+      <div className="max-w-md mx-auto p-6">
+        <p>Loading profile...</p>
+      </div>
+    );
+  }
+
+  if (!session) {
+    return <Navigate to="/login" replace />;
+  }
 
   return (
     <div className="profile-page">
@@ -48,12 +85,13 @@ export default function Profile() {
 
       {/* Profile Info */}
       <div className="profile-info">
+        {error && <div className="alert error">{error}</div>}
         <div className="profile-header">
           <div>
             <h1>{user.name}</h1>
             <p className="username">@{user.username}</p>
           </div>
-          <button className="btn outline">Edit Profile</button>
+          <button className="btn outline" onClick={() => navigate('/profile/edit')}>Edit Profile</button>
         </div>
         
         <p className="bio">{user.bio}</p>

@@ -67,8 +67,23 @@ export default function Register() {
         return;
       }
 
-      // If auto-confirmed, take the user to onboarding
+      // If auto-confirmed, ensure profile row exists, then take the user to onboarding
       localStorage.setItem('userRole', data.session.user.user_metadata?.role || 'traveler');
+      const uid = data.session.user.id;
+      const { error: upsertError } = await supabase.from('profiles').upsert({ id: uid });
+      if (upsertError) {
+        console.warn('Unable to upsert profile on register:', upsertError.message);
+      }
+      // Best-effort set name on profiles from registration input
+      if (formData.name) {
+        const { error: nameErr } = await supabase
+          .from('profiles')
+          .update({ name: formData.name })
+          .eq('id', uid);
+        if (nameErr) {
+          console.debug('profiles.name not updated (may not exist):', nameErr.message);
+        }
+      }
       navigate('/onboarding', { replace: true });
     } catch (err) {
       setError(err.message || 'Failed to create an account. Please try again.');

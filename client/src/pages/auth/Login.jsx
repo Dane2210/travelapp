@@ -31,8 +31,28 @@ export default function Login() {
       });
       if (error) throw error;
 
-      const role = data.session?.user?.user_metadata?.role || 'traveler';
+      const user = data.session?.user;
+      const role = user?.user_metadata?.role || 'traveler';
       localStorage.setItem('userRole', role);
+
+      // Ensure a profile row exists for this user (schema-agnostic: only id)
+      const { error: upsertError } = await supabase.from('profiles').upsert({ id: user.id });
+      if (upsertError) {
+        console.warn('Unable to upsert profile:', upsertError.message);
+      }
+
+      // Best-effort: update name if column exists
+      const displayName = user.user_metadata?.name || user.user_metadata?.full_name;
+      if (displayName) {
+        const { error: nameError } = await supabase
+          .from('profiles')
+          .update({ name: displayName })
+          .eq('id', user.id);
+        if (nameError) {
+          // Ignore if column doesn't exist
+          console.debug('profiles.name not updated (may not exist):', nameError.message);
+        }
+      }
 
       if (role === 'moderator' || role === 'admin') {
         navigate('/moderator', { replace: true });
