@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabaseClient';
 
@@ -9,6 +9,8 @@ export default function Profile() {
   const [profile, setProfile] = useState(null);
   const [error, setError] = useState('');
   const navigate = useNavigate();
+  const [trips, setTrips] = useState([]);
+  const [tripsError, setTripsError] = useState('');
 
   useEffect(() => {
     let mounted = true;
@@ -30,6 +32,17 @@ export default function Profile() {
         setError(err.message);
       } else {
         setProfile(rows || null);
+      }
+      // Load user's trips
+      const { data: tripsRows, error: tripsErr } = await supabase
+        .from('trips')
+        .select('id,destination,start_date,end_date,notes,created_at')
+        .eq('auth_user_id', uid)
+        .order('start_date', { ascending: true });
+      if (tripsErr) {
+        setTripsError(tripsErr.message);
+      } else {
+        setTrips(tripsRows || []);
       }
       setLoading(false);
     })();
@@ -153,53 +166,18 @@ export default function Profile() {
       <div className="tab-content">
         {activeTab === 'trips' && (
           <div className="trips-tab">
-            <h2>Upcoming Trips</h2>
-            {user.upcomingTrips.length > 0 ? (
-              <div className="trip-list">
-                {user.upcomingTrips.map(trip => (
-                  <div key={trip.id} className="trip-card">
-                    <div className="trip-info">
-                      <h3>{trip.destination}</h3>
-                      <p>{trip.dates}</p>
-                    </div>
-                    <div className="trip-actions">
-                      <Link to={`/trips/${trip.id}`} className="btn">View Details</Link>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="empty-state">
-                <p>No upcoming trips planned.</p>
-                <Link to="/trips/new" className="btn">Plan a Trip</Link>
-              </div>
-            )}
-            
-            <h2>Past Trips</h2>
-            {user.pastTrips.length > 0 ? (
-              <div className="trip-list">
-                {user.pastTrips.map(trip => (
-                  <div key={trip.id} className="trip-card">
-                    <div className="trip-info">
-                      <h3>{trip.destination}</h3>
-                      <p>{trip.dates}</p>
-                      <div className="rating">
-                        {[...Array(5)].map((_, i) => (
-                          <span key={i} className={i < trip.rating ? 'filled' : ''}>★</span>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="trip-actions">
-                      <Link to={`/trips/${trip.id}`} className="btn outline">View Details</Link>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="empty-state">
-                <p>No past trips found.</p>
-              </div>
-            )}
+            {tripsError && <div className="alert error">{tripsError}</div>}
+            <TripsSection trips={trips} onDelete={(id)=>{
+              // delete trip then update local state
+              (async () => {
+                const { error } = await supabase.from('trips').delete().eq('id', id);
+                if (error) {
+                  alert('Failed to delete trip: ' + error.message);
+                  return;
+                }
+                setTrips(prev => prev.filter(t => t.id !== id));
+              })();
+            }} />
           </div>
         )}
         
@@ -231,5 +209,75 @@ export default function Profile() {
         )}
       </div>
     </div>
+  );
+}
+
+function TripsSection({ trips, onDelete }) {
+  const grouped = useMemo(() => {
+    const now = new Date();
+    const fmt = (trip) => {
+      const sd = trip.start_date ? new Date(trip.start_date) : null;
+      const ed = trip.end_date ? new Date(trip.end_date) : null;
+      const dates = sd && ed
+        ? `${sd.toLocaleDateString()} - ${ed.toLocaleDateString()}`
+        : sd ? `${sd.toLocaleDateString()}` : '';
+      return { ...trip, _sd: sd, _ed: ed, dates };
+    };
+    const upcoming = [];
+    const past = [];
+    for (const t of (trips || []).map(fmt)) {
+      const isPast = t._ed ? t._ed < now : false;
+      (isPast ? past : upcoming).push(t);
+    }
+    return { upcoming, past };
+  }, [trips]);
+
+  return (
+    <>
+      <h2>Upcoming Trips</h2>
+      {grouped.upcoming.length > 0 ? (
+        <div className="trip-list">
+          {grouped.upcoming.map(trip => (
+            <div key={trip.id} className="trip-card">
+              <div className="trip-info">
+                <h3>{trip.destination}</h3>
+                <p>{trip.dates}</p>
+              </div>
+              <div className="trip-actions flex gap-2">
+                <Link to={`/trips/${trip.id}`} className="btn">View Details</Link>
+                <button className="btn outline" onClick={() => onDelete && onDelete(trip.id)}>Delete</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="empty-state">
+          <p>No upcoming trips planned.</p>
+          <Link to="/trips/new" className="btn">Plan a Trip</Link>
+        </div>
+      )}
+
+      <h2>Past Trips</h2>
+      {grouped.past.length > 0 ? (
+        <div className="trip-list">
+          {grouped.past.map(trip => (
+            <div key={trip.id} className="trip-card">
+              <div className="trip-info">
+                <h3>{trip.destination}</h3>
+                <p>{trip.dates}</p>
+              </div>
+              <div className="trip-actions flex gap-2">
+                <Link to={`/trips/${trip.id}`} className="btn outline">View Details</Link>
+                <button className="btn outline" onClick={() => onDelete && onDelete(trip.id)}>Delete</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="empty-state">
+          <p>No past trips found.</p>
+        </div>
+      )}
+    </>
   );
 }

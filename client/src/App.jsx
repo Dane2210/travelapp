@@ -9,6 +9,7 @@ import './styles/global.css';
 // Pages
 import Home from './pages/Home';
 import Trips from './pages/trips/Trips';
+import NewTrip from './pages/trips/NewTrip';
 import Community from './pages/community/Community';
 import Profile from './pages/profile/Profile';
 import EditProfile from './pages/profile/EditProfile';
@@ -214,6 +215,11 @@ export default function App() {
               <Route path="/profile" element={
                 <ProtectedRoute isAuthenticated={isAuthenticated}>
                   <Profile />
+                </ProtectedRoute>
+              } />
+              <Route path="/trips/new" element={
+                <ProtectedRoute isAuthenticated={isAuthenticated}>
+                  <NewTrip />
                 </ProtectedRoute>
               } />
               <Route path="/profile/edit" element={
