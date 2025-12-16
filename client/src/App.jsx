@@ -135,8 +135,11 @@ function Navigation() {
 }
 
 // Protected Route Component with optional roles
-function ProtectedRoute({ children, isAuthenticated, roles }) {
+function ProtectedRoute({ children, isAuthenticated, roles, authChecked }) {
   const role = localStorage.getItem('userRole');
+  if (!authChecked) {
+    return null; // wait until we know session state
+  }
   if (!isAuthenticated) {
     return <Navigate to="/login" />;
   }
@@ -165,6 +168,7 @@ function OnboardingGate({ children }) {
 // Main App Component
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
 
   // Check authentication status on initial load
   useEffect(() => {
@@ -173,11 +177,13 @@ export default function App() {
       const { data } = await supabase.auth.getSession();
       if (!mounted) return;
       setIsAuthenticated(!!data.session);
+      setAuthChecked(true);
     }
     init();
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       setIsAuthenticated(!!session);
+      setAuthChecked(true);
       if (session?.user?.user_metadata?.role) {
         localStorage.setItem('userRole', session.user.user_metadata.role);
       } else if (!session) {
@@ -207,23 +213,23 @@ export default function App() {
               <Route path="/" element={<Home />} />
               <Route path="/search" element={<Search />} />
               <Route path="/trips" element={
-                <ProtectedRoute isAuthenticated={isAuthenticated}>
+                <ProtectedRoute isAuthenticated={isAuthenticated} authChecked={authChecked}>
                   <Trips />
                 </ProtectedRoute>
               } />
               <Route path="/community" element={<Community />} />
               <Route path="/profile" element={
-                <ProtectedRoute isAuthenticated={isAuthenticated}>
+                <ProtectedRoute isAuthenticated={isAuthenticated} authChecked={authChecked}>
                   <Profile />
                 </ProtectedRoute>
               } />
               <Route path="/trips/new" element={
-                <ProtectedRoute isAuthenticated={isAuthenticated}>
+                <ProtectedRoute isAuthenticated={isAuthenticated} authChecked={authChecked}>
                   <NewTrip />
                 </ProtectedRoute>
               } />
               <Route path="/profile/edit" element={
-                <ProtectedRoute isAuthenticated={isAuthenticated}>
+                <ProtectedRoute isAuthenticated={isAuthenticated} authChecked={authChecked}>
                   <EditProfile />
                 </ProtectedRoute>
               } />
@@ -233,7 +239,7 @@ export default function App() {
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/onboarding" element={<OnboardingWizard />} />
               <Route path="/moderator" element={
-                <ProtectedRoute isAuthenticated={isAuthenticated} roles={['moderator','admin']}>
+                <ProtectedRoute isAuthenticated={isAuthenticated} roles={['moderator','admin']} authChecked={authChecked}>
                   <ModeratorPanel />
                 </ProtectedRoute>
               } />
